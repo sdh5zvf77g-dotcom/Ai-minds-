@@ -10,19 +10,20 @@
 <meta name="apple-mobile-web-app-title" content="Agent Council">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon.png">
 <title>Agent Council – Multi-Agent Workspace</title>
 <style>
 :root{--bg:#0f1220;--panel:#171b2e;--panel2:#1f2440;--text:#e9ecf8;--muted:#9aa3c7;--accent:#7c8cff;--ok:#4cd9a0;--warn:#ffb86b;--bad:#ff6b8a;--border:#2b3156;--radius:14px}
 :root.light{--bg:#f4f6fc;--panel:#fff;--panel2:#eef1fb;--text:#1a2040;--muted:#5b6490;--accent:#4a5bff;--border:#d6dbf0}
 *{box-sizing:border-box}
-html,body{margin:0;height:100%;min-height:100%;overscroll-behavior:none} body{padding-bottom:env(safe-area-inset-bottom)}
+html,body{margin:0;height:100%;min-height:100%;overscroll-behavior:none;-webkit-text-size-adjust:100%} body{padding-bottom:env(safe-area-inset-bottom)}
 body{background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
 :focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 .app{display:grid;grid-template-columns:320px 1fr;height:100vh;height:100dvh}
+#sidebarBackdrop{display:none}
 aside{background:var(--panel);border-right:1px solid var(--border);overflow:auto;padding:14px;display:flex;flex-direction:column;gap:12px}
 main{display:flex;flex-direction:column;min-width:0;height:100%}
 header.top{display:flex;gap:8px;align-items:center;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;border-bottom:1px solid var(--border);background:var(--panel)}
@@ -67,14 +68,19 @@ dialog::backdrop{background:#000a}
 @media (prefers-reduced-motion:reduce){.typing{animation:none}}
 @media (max-width:820px){
  .app{grid-template-columns:1fr}
- aside{position:fixed;inset:0 20% 0 0;z-index:20;transform:translateX(-102%);transition:transform .2s;max-width:340px;width:85%;box-shadow:4px 0 24px #0008}
- aside.open{transform:none}
+ aside{position:fixed;inset:0 auto 0 0;z-index:30;transform:translateX(-105%);transition:transform .22s ease;max-width:none;width:min(88vw,360px);height:100vh;height:100dvh;padding:calc(14px + env(safe-area-inset-top)) 14px calc(14px + env(safe-area-inset-bottom));overflow-y:auto;overscroll-behavior:contain;box-shadow:4px 0 24px #0008}
+ aside.open{transform:translateX(0)}
+ aside>.row:first-child{position:sticky;top:0;z-index:2;background:var(--panel);padding:6px 0 12px;min-height:52px}
+ #closeSide{display:inline-flex;align-items:center;justify-content:center;position:relative;z-index:5;flex:0 0 44px;width:44px;height:44px;font-size:22px;background:var(--accent);color:white;border:2px solid white;box-shadow:0 2px 8px #0005}
  .menu-btn{display:inline-block}
+ #sidebarBackdrop{display:block;position:fixed;inset:0;z-index:25;background:#0009;opacity:0;pointer-events:none;transition:opacity .22s}
+ #sidebarBackdrop.visible{opacity:1;pointer-events:auto}
 }
 </style>
 </head>
 <body>
 <div class="app">
+<div id="sidebarBackdrop" aria-hidden="true"></div>
 <aside id="side" aria-label="Agent settings">
  <div class="row"><strong style="flex:1">Agent Council</strong><button class="btn menu-btn" id="closeSide" aria-label="Close panel">✕</button></div>
 
@@ -114,7 +120,8 @@ dialog::backdrop{background:#000a}
     <option value="demo">Demo (simulated, no network)</option>
     <option value="live">Live (OpenRouter + Ollama)</option>
    </select></div>
-  <div class="row"><button class="btn" id="refreshModels">Refresh OpenRouter model list</button></div>
+  <div class="row"><button class="btn primary" id="testOpenRouter">Test API key</button><button class="btn" id="refreshModels">Refresh OpenRouter model list</button></div>
+  <p class="status" id="connectionHelp">Enter your key and tap Test API key. Adding a key switches the app to Live mode automatically.</p>
   <p class="status">Model IDs are editable. The model-list button fetches current public OpenRouter model IDs when online. Keys entered here are stored in this browser's local storage; use this only on a trusted device. For production or shared deployments, use a secure backend proxy instead.</p>
  </div>
 
@@ -158,7 +165,7 @@ dialog::backdrop{background:#000a}
   <div class="field"><label for="eName">Name</label><input id="eName"></div>
   <div class="field"><label for="eProv">Provider</label>
    <select id="eProv"><option value="openrouter">OpenRouter</option><option value="ollama">Ollama (local)</option></select></div>
-  <div class="field"><label for="eModel">Model ID</label><input id="eModel" placeholder="e.g. vendor/model:free"></div>
+  <div class="field"><label for="eModel">Model ID</label><input id="eModel" list="modelOptions" placeholder="e.g. provider/model-id" autocomplete="off"><datalist id="modelOptions"></datalist></div>
   <div class="field"><label for="eRole">Role / system prompt</label><textarea id="eRole" rows="4"></textarea></div>
   <div class="row" style="margin-top:12px;justify-content:flex-end">
    <button class="btn" value="cancel">Cancel</button>
@@ -174,14 +181,14 @@ var $=function(id){return document.getElementById(id)};
 var COLORS=["#7c8cff","#4cd9a0","#ffb86b","#ff6b8a","#6bd5ff","#c58bff","#ffd56b","#8bffb0","#ff8f6b","#6bffe0","#b0b8ff"];
 var ROLES=[
  ["OpenRouter Free","openrouter","openrouter/free","Generalist. Give balanced, practical answers."],
- ["Nemotron 3 Ultra","openrouter","nvidia/nemotron-3-ultra","Deep reasoner. Solve hard problems step by step."],
- ["Nemotron 3 Super","openrouter","nvidia/nemotron-3-super","Strategist. Plan approaches and weigh trade-offs."],
- ["Gemma 4 31B","openrouter","google/gemma-4-31b","Explainer. Make things clear and simple."],
- ["Inkling","openrouter","inkling","Writer. Draft polished text and documentation."],
- ["Nemotron 3.5 Lightning","openrouter","nvidia/nemotron-3.5-lightning","Fast responder. Give quick sanity checks and short answers."],
- ["North Mini Code","openrouter","north-mini-code","Coder. Produce concise working code."],
- ["Qwen3.8 27B","openrouter","qwen/qwen3.8-27b","Analyst. Check facts, logic and edge cases."],
- ["Qwen3.8 Max","openrouter","qwen/qwen3.8-max","Lead architect. Integrate everything into a robust solution."],
+ ["Nemotron 3 Ultra","openrouter","openrouter/free","Deep reasoner. Solve hard problems step by step."],
+ ["Nemotron 3 Super","openrouter","openrouter/free","Strategist. Plan approaches and weigh trade-offs."],
+ ["Gemma 4 31B","openrouter","openrouter/free","Explainer. Make things clear and simple."],
+ ["Inkling","openrouter","openrouter/free","Writer. Draft polished text and documentation."],
+ ["Nemotron 3.5 Lightning","openrouter","openrouter/free","Fast responder. Give quick sanity checks and short answers."],
+ ["North Mini Code","openrouter","openrouter/free","Coder. Produce concise working code."],
+ ["Qwen3.8 27B","openrouter","openrouter/free","Analyst. Check facts, logic and edge cases."],
+ ["Qwen3.8 Max","openrouter","openrouter/free","Lead architect. Integrate everything into a robust solution."],
  ["Ollama Local","ollama","llama3","Private local assistant. Be concise."],
  ["Critic","openrouter","openrouter/free","Critic. Find flaws, risks and missing pieces in what others said."]
 ];
@@ -192,7 +199,9 @@ function load(){
  var s=null;try{s=JSON.parse(store.get("ac_agents"))}catch(e){}
  agents=ROLES.map(function(r,i){
   var o={id:i,name:r[0],provider:r[1],model:r[2],role:r[3],on:i<5,color:COLORS[i]};
-  if(s&&s[i]){for(var k in s[i])o[k]=s[i][k]}
+  if(s&&s[i]){for(var k in s[i])o[k]=s[i][k];}
+  var legacyFreeIds=["openrouter/free","nvidia/nemotron-3-ultra","nvidia/nemotron-3-super","google/gemma-4-31b","inkling","nvidia/nemotron-3.5-lightning","north-mini-code","qwen/qwen3.8-27b","qwen/qwen3.8-max"];
+  if(o.provider==="openrouter" && legacyFreeIds.indexOf(o.model)!==-1)o.model="openrouter/free";
   return o;
  });
  try{var h=JSON.parse(store.get("ac_hist"));if(Array.isArray(h))history=h}catch(e){}
@@ -297,15 +306,18 @@ async function liveReply(a,task,extra){
  if(a.provider==="ollama"){
   var base=$("ollamaUrl").value.replace(/\/$/,"");
   r=await fetch(base+"/api/chat",{method:"POST",signal:abort.signal,headers:{"Content-Type":"application/json"},body:JSON.stringify({model:a.model,messages:msgs,stream:false})});
-  if(!r.ok)throw new Error("Ollama HTTP "+r.status);
-  j=await r.json();return j.message&&j.message.content||"(empty)";
+  if(!r.ok){var ot="";try{ot=await r.text()}catch(e){}throw new Error("Ollama HTTP "+r.status+" — "+(ot||"check the Ollama URL, model name and network access").slice(0,500))}
+  j=await r.json();var oc=j.message&&j.message.content; if(!oc)throw new Error("Ollama returned an empty response. Check the model name and try again.");return oc;
  }
  var key=$("orKey").value.trim();
- if(!key)throw new Error("Missing OpenRouter API key");
- r=await fetch("https://openrouter.ai/api/v1/chat/completions",{method:"POST",signal:abort.signal,headers:{"Content-Type":"application/json","Authorization":"Bearer "+key},body:JSON.stringify({model:a.model,messages:msgs})});
- if(!r.ok){var tx="";try{tx=(await r.text()).slice(0,200)}catch(e){}throw new Error("OpenRouter HTTP "+r.status+" "+tx)}
+ if(!key)throw new Error("Missing OpenRouter API key. Paste it in Connections, then tap Test API key.");
+ r=await fetch("https://openrouter.ai/api/v1/chat/completions",{method:"POST",signal:abort.signal,headers:{"Content-Type":"application/json","Authorization":"Bearer "+key},body:JSON.stringify({model:a.model||"openrouter/free",messages:msgs,temperature:0.4})});
+ if(!r.ok){var tx="";try{var ej=await r.json();tx=ej&&ej.error&&(ej.error.message||JSON.stringify(ej.error))||JSON.stringify(ej)}catch(e){try{tx=await r.text()}catch(e2){}}var hint="";if(r.status===401)hint=" The API key is invalid or revoked.";else if(r.status===402)hint=" Your account may need credits or have a negative balance; check whether the selected model is free.";else if(r.status===429)hint=" Free-model rate limit reached; wait and try again.";else if(r.status===404)hint=" Model ID not found; choose openrouter/free or refresh the model list.";throw new Error("OpenRouter HTTP "+r.status+": "+(tx||"request failed")+hint)}
  j=await r.json();
- return j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content||"(empty)";
+ var content=j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content;
+ if(Array.isArray(content))content=content.map(function(part){return typeof part==="string"?part:(part.text||"")}).join("");
+ if(!content)throw new Error("OpenRouter returned no message text. Try again or select another model. Response model: "+(j.model||"unknown"));
+ return content;
 }
 async function ask(a,task,extra,tag){
  var ph=addMsg({type:"agent",who:a.name,color:a.color,tag:tag,text:"…thinking"},true);
@@ -399,8 +411,13 @@ $("export").onclick=function(){
  }catch(e){sys("Export failed: "+e.message)}
 };
 ["orKey","ollamaUrl","demo","mode"].forEach(function(id){$(id).addEventListener("change",save)});
-$("openSide").onclick=function(){$("side").classList.add("open")};
-$("closeSide").onclick=function(){$("side").classList.remove("open")};
+function openSidebar(){ $("side").classList.add("open"); $("sidebarBackdrop").classList.add("visible"); $("openSide").setAttribute("aria-expanded","true"); }
+function closeSidebar(){ $("side").classList.remove("open"); $("sidebarBackdrop").classList.remove("visible"); $("openSide").setAttribute("aria-expanded","false"); }
+$("openSide").onclick=openSidebar;
+$("closeSide").onclick=closeSidebar;
+$("sidebarBackdrop").onclick=closeSidebar;
+document.addEventListener("keydown",function(e){if(e.key==="Escape")closeSidebar()});
+window.addEventListener("resize",function(){if(window.innerWidth>820)closeSidebar()});
 $("closeSide").classList.add("menu-btn");
 
 
@@ -424,6 +441,25 @@ $("closeSide").classList.add("menu-btn");
    document.querySelectorAll("#eModel").forEach(function(el){el.setAttribute("list","modelOptions")});
    sys("Loaded "+dl.children.length+" public OpenRouter model IDs. Availability, pricing, context limits and permissions vary by model; choose a model ID in an agent's Edit dialog.");
   }catch(e){sys("Could not refresh model list: "+e.message+". Check your connection and try again.");}
+  finally{b.disabled=false;b.textContent=old;}
+ };
+ // Entering a key should actually enable live calls, rather than silently remaining in Demo mode.
+ $("orKey").addEventListener("change",function(){
+  if($("orKey").value.trim()){$("demo").value="live";$("connectionHelp").textContent="Key entered. Live mode is enabled; tap Test API key to confirm the connection.";}
+  save();
+ });
+ $("testOpenRouter").onclick=async function(){
+  var b=$("testOpenRouter"),old=b.textContent,key=$("orKey").value.trim();
+  if(!key){sys("Paste your OpenRouter API key first.");$("orKey").focus();return;}
+  b.disabled=true;b.textContent="Testing…";$("demo").value="live";save();
+  try{
+   var rr=await fetch("https://openrouter.ai/api/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+key},body:JSON.stringify({model:"openrouter/free",messages:[{role:"user",content:"Reply with exactly: Agent Council connection works."}],max_tokens:40})});
+   var jj;try{jj=await rr.json()}catch(e){jj={}}
+   if(!rr.ok){var msg=jj&&jj.error&&(jj.error.message||JSON.stringify(jj.error))||("HTTP "+rr.status);throw new Error(msg+(rr.status===401?" — API key invalid or revoked.":rr.status===402?" — account balance or model access problem.":rr.status===429?" — free-model rate limit; wait and retry.":""));}
+   var answer=jj.choices&&jj.choices[0]&&jj.choices[0].message&&jj.choices[0].message.content;
+   if(!answer)throw new Error("API responded but returned no message text.");
+   $("connectionHelp").textContent="Connected successfully. Model used: "+(jj.model||"OpenRouter free router");sys("OpenRouter connection test passed. Reply: "+answer);
+  }catch(e){$("connectionHelp").textContent="Connection failed: "+(e.message||String(e));sys("OpenRouter test failed: "+(e.message||String(e)));}
   finally{b.disabled=false;b.textContent=old;}
  };
  load();renderAgents();

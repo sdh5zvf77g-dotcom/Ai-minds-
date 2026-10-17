@@ -1,23 +1,21 @@
-# Agent Council — GitHub Pages PWA
+# Agent Council — iPhone GitHub Pages PWA (connection fix)
 
-A mobile-friendly progressive web app based on the supplied Agent Council HTML, with your supplied blue brain image used for the iPhone icon. Includes an installable web-app manifest, offline app-shell caching, custom agent creation, and a public OpenRouter model-ID refresh helper.
+## Publish / update
+1. Extract this ZIP.
+2. Upload and replace **all files and folders** in the GitHub repository root, including `index.html`, `sw.js`, `manifest.webmanifest`, and `icons/`.
+3. In GitHub: **Settings → Pages → Deploy from a branch → main → /(root)**.
+4. Wait for deployment to finish. On iPhone, remove the old Home Screen shortcut, open the published HTTPS site in Safari, then **Share → Add to Home Screen** to refresh the icon and cached app.
 
-## Publish to GitHub Pages
-1. Create or open a GitHub repository.
-2. Upload **all files and folders** in this package, keeping the `icons/` folder.
-3. In **Settings → Pages**, choose **Deploy from a branch**, select your branch (usually `main`) and folder `/ (root)`, then Save.
-4. Open the published HTTPS URL in Safari on your iPhone.
-5. Tap **Share → Add to Home Screen**. If offered, enable **Open as Web App**, then tap Add.
+## Connect free OpenRouter models
+1. Create an OpenRouter API key at https://openrouter.ai/keys.
+2. In Agent Council's Connections panel, paste the key.
+3. Tap **Test API key**. The app sends a short test request using OpenRouter's documented `openrouter/free` router.
+4. If the test succeeds, Live mode is enabled. The built-in cloud agents use `openrouter/free` by default so old invalid model IDs are migrated automatically. Their individual role prompts differ, but OpenRouter chooses the underlying free model for each request; these are not separate guaranteed model families.
+5. If the test fails, the app shows the API error. HTTP 401 usually means the key is invalid/revoked; 402 can indicate balance/account restrictions; 429 means a rate limit. Free-model availability is not guaranteed and free usage is rate-limited.
 
-## Connect models
-- Choose **Live** in Backend.
-- For OpenRouter, add an API key and set each agent's model ID to an ID available to your account. Use **Refresh OpenRouter model list** while online to fetch current public IDs; it does not verify account access or pricing.
-- For Ollama, set the Ollama URL to an address reachable from the device. `http://localhost:11434` only refers to the device running the browser; on an iPhone, use a reachable Mac/PC LAN address and configure Ollama/network access appropriately. Browsers can block insecure cross-origin requests, so a secure HTTPS reverse proxy may be needed.
-- Add custom agents using **+ Add agent**. Current built-in provider choices are OpenRouter and Ollama.
-
-## Important limits and security
-- This is a client-side app, not a secure multi-user service. API keys are stored in browser local storage by the existing app design. Anyone with access to that browser profile may be able to use them. Avoid shared/public devices; for stronger security, add a backend proxy and do not expose provider keys in client code.
-- OpenRouter provides access only to models it lists and your account can use. This is not automatic access to every AI agent worldwide; separate providers may require their own API integration and credentials.
-- GitHub Pages hosts static files only. It does not run a private server or proxy.
-- Demo mode is simulated and does not contact real AI models. Live mode requires valid provider credentials, model IDs, connectivity and provider support.
-- The service worker caches the app shell for reopening offline. Real model calls and model-list refresh require internet access.
+## Important
+- Demo mode produces simulated responses. Live mode is required for real model responses. Entering a key switches to Live mode; the Test API key button also enables Live mode.
+- Free models can be temporarily unavailable or rate limited. Test again later if the API reports a provider/rate-limit error.
+- Ollama is a separate local connection. `localhost` on an iPhone refers to the iPhone, not your Mac/PC. Use a reachable LAN address and appropriate network/CORS configuration.
+- This static app stores the API key in browser local storage. Do not use it on a shared device; a secure backend proxy is safer for a production app. Never commit API keys to GitHub.
+- GitHub Pages hosts static files only; it does not run a private server.
