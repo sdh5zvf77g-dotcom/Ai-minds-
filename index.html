@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1220">
+<meta name="description" content="A multi-agent AI workspace for coordinating compatible cloud and local AI models.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Agent Council">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<title>Agent Council – Multi-Agent Workspace</title>
+<style>
+:root{--bg:#0f1220;--panel:#171b2e;--panel2:#1f2440;--text:#e9ecf8;--muted:#9aa3c7;--accent:#7c8cff;--ok:#4cd9a0;--warn:#ffb86b;--bad:#ff6b8a;--border:#2b3156;--radius:14px}
+:root.light{--bg:#f4f6fc;--panel:#fff;--panel2:#eef1fb;--text:#1a2040;--muted:#5b6490;--accent:#4a5bff;--border:#d6dbf0}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;min-height:100%;overscroll-behavior:none} body{padding-bottom:env(safe-area-inset-bottom)}
+body{background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.app{display:grid;grid-template-columns:320px 1fr;height:100vh;height:100dvh}
+aside{background:var(--panel);border-right:1px solid var(--border);overflow:auto;padding:14px;display:flex;flex-direction:column;gap:12px}
+main{display:flex;flex-direction:column;min-width:0;height:100%}
+header.top{display:flex;gap:8px;align-items:center;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;border-bottom:1px solid var(--border);background:var(--panel)}
+header.top h1{font-size:17px;margin:0;flex:1}
+.btn{background:var(--panel2);border:1px solid var(--border);padding:8px 12px;border-radius:10px;min-height:40px}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.btn.danger{color:var(--bad)}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.menu-btn{display:none}
+h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:6px 0}
+.agent{display:flex;gap:10px;align-items:center;background:var(--panel2);border:1px solid var(--border);border-radius:12px;padding:8px 10px}
+.agent input[type=checkbox]{width:20px;height:20px;accent-color:var(--accent)}
+.dot{width:12px;height:12px;border-radius:50%;flex:none}
+.agent .meta{flex:1;min-width:0}
+.agent .name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.agent .role{font-size:12px;color:var(--muted)}
+.agent button{padding:4px 8px;min-height:32px;font-size:12px}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:12px;color:var(--muted)}
+.field input,.field select,.field textarea{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:8px}
+#log{flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
+.msg{max-width:860px;border:1px solid var(--border);border-left-width:5px;background:var(--panel);border-radius:var(--radius);padding:10px 12px}
+.msg.user{align-self:flex-end;background:var(--panel2)}
+.msg.sys{color:var(--muted);font-size:13px;border-style:dashed}
+.msg .who{font-weight:700;font-size:13px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.msg .who small{color:var(--muted);font-weight:400}
+.msg .body{white-space:pre-wrap;word-wrap:break-word;margin-top:4px}
+.msg pre{background:#0008;color:#e9ecf8;padding:10px;border-radius:8px;overflow:auto;white-space:pre}
+.tag{font-size:11px;padding:1px 7px;border-radius:99px;background:var(--panel2);border:1px solid var(--border);color:var(--muted)}
+.composer{border-top:1px solid var(--border);background:var(--panel);padding:10px 14px;display:flex;flex-direction:column;gap:8px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.composer textarea{width:100%;min-height:64px;max-height:200px;resize:vertical;background:var(--panel2);border:1px solid var(--border);border-radius:12px;padding:10px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font-size:13px;padding:5px 10px;border-radius:99px;background:var(--panel2);border:1px solid var(--border)}
+.chip[aria-pressed=true]{background:var(--accent);color:#fff;border-color:var(--accent)}
+.status{font-size:12px;color:var(--muted)}
+dialog{background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:16px;max-width:520px;width:calc(100% - 24px);padding:16px}
+dialog::backdrop{background:#000a}
+.typing{display:inline-block;animation:p 1s infinite}
+@keyframes p{50%{opacity:.3}}
+@media (prefers-reduced-motion:reduce){.typing{animation:none}}
+@media (max-width:820px){
+ .app{grid-template-columns:1fr}
+ aside{position:fixed;inset:0 20% 0 0;z-index:20;transform:translateX(-102%);transition:transform .2s;max-width:340px;width:85%;box-shadow:4px 0 24px #0008}
+ aside.open{transform:none}
+ .menu-btn{display:inline-block}
+}
+</style>
+</head>
+<body>
+<div class="app">
+<aside id="side" aria-label="Agent settings">
+ <div class="row"><strong style="flex:1">Agent Council</strong><button class="btn menu-btn" id="closeSide" aria-label="Close panel">✕</button></div>
+
+ <div>
+  <h2>Agents (<span id="activeCount">0</span> active)</h2>
+  <div class="row" style="margin-bottom:8px">
+   <button class="btn" id="allOn">All on</button>
+   <button class="btn" id="allOff">All off</button>
+    <button class="btn" id="addAgent">+ Add agent</button>
+  </div>
+  <div id="agents" style="display:flex;flex-direction:column;gap:8px"></div>
+ </div>
+
+ <div>
+  <h2>Collaboration</h2>
+  <div class="field"><label for="mode">Mode</label>
+   <select id="mode">
+    <option value="roundtable">Round table – each agent replies, seeing others</option>
+    <option value="pipeline">Pipeline – agents build on each other in order</option>
+    <option value="debate">Debate – multiple rounds, then synthesis</option>
+    <option value="solo">Direct – only @mentioned agents</option>
+   </select></div>
+  <div class="field"><label for="rounds">Rounds (for round table / debate)</label>
+   <input id="rounds" type="number" min="1" max="5" value="2"></div>
+  <div class="field"><label for="synth">Synthesizer (final answer)</label>
+   <select id="synth"></select></div>
+ </div>
+
+ <div>
+  <h2>Connections</h2>
+  <div class="field"><label for="orKey">OpenRouter API key</label>
+   <input id="orKey" type="password" autocomplete="off" placeholder="sk-or-..."></div>
+  <div class="field"><label for="ollamaUrl">Ollama URL</label>
+   <input id="ollamaUrl" value="http://localhost:11434"></div>
+  <div class="field"><label for="demo">Backend</label>
+   <select id="demo">
+    <option value="demo">Demo (simulated, no network)</option>
+    <option value="live">Live (OpenRouter + Ollama)</option>
+   </select></div>
+  <div class="row"><button class="btn" id="refreshModels">Refresh OpenRouter model list</button></div>
+  <p class="status">Model IDs are editable. The model-list button fetches current public OpenRouter model IDs when online. Keys entered here are stored in this browser's local storage; use this only on a trusted device. For production or shared deployments, use a secure backend proxy instead.</p>
+ </div>
+
+ <div class="row">
+  <button class="btn" id="theme">Toggle theme</button>
+  <button class="btn" id="export">Export chat</button>
+  <button class="btn danger" id="clear">Clear</button>
+ </div>
+</aside>
+
+<main>
+ <header class="top">
+  <button class="btn menu-btn" id="openSide" aria-label="Open agent panel">☰</button>
+  <h1>Multi-Agent Workspace</h1>
+  <span class="status" id="state" role="status" aria-live="polite">Idle</span>
+  <button class="btn danger" id="stop" disabled>Stop</button>
+ </header>
+
+ <div id="log" role="log" aria-live="polite" aria-label="Conversation"></div>
+
+ <form class="composer" id="form">
+  <div class="chips" role="group" aria-label="Quick task templates">
+   <button type="button" class="chip" data-t="Plan: Break this problem into steps and identify risks: ">Plan</button>
+   <button type="button" class="chip" data-t="Build: Write working code for: ">Build</button>
+   <button type="button" class="chip" data-t="Review: Critique this and find bugs or weaknesses: ">Review</button>
+   <button type="button" class="chip" data-t="Brainstorm: Give creative options for: ">Brainstorm</button>
+  </div>
+  <label class="sr" for="input">Message to agents</label>
+  <textarea id="input" placeholder="Describe the problem or project. Use @Name to address a specific agent. Ctrl/Cmd+Enter to send."></textarea>
+  <div class="row">
+   <button class="btn primary" type="submit" id="send">Send to council</button>
+   <span class="status" id="hint"></span>
+  </div>
+ </form>
+</main>
+</div>
+
+<dialog id="editor">
+ <form method="dialog" id="editForm">
+  <h2 style="margin-top:0">Edit agent</h2>
+  <div class="field"><label for="eName">Name</label><input id="eName"></div>
+  <div class="field"><label for="eProv">Provider</label>
+   <select id="eProv"><option value="openrouter">OpenRouter</option><option value="ollama">Ollama (local)</option></select></div>
+  <div class="field"><label for="eModel">Model ID</label><input id="eModel" placeholder="e.g. vendor/model:free"></div>
+  <div class="field"><label for="eRole">Role / system prompt</label><textarea id="eRole" rows="4"></textarea></div>
+  <div class="row" style="margin-top:12px;justify-content:flex-end">
+   <button class="btn" value="cancel">Cancel</button>
+   <button class="btn primary" value="save" id="eSave">Save</button>
+  </div>
+ </form>
+</dialog>
+
+<script>
+(function(){
+"use strict";
+var $=function(id){return document.getElementById(id)};
+var COLORS=["#7c8cff","#4cd9a0","#ffb86b","#ff6b8a","#6bd5ff","#c58bff","#ffd56b","#8bffb0","#ff8f6b","#6bffe0","#b0b8ff"];
+var ROLES=[
+ ["OpenRouter Free","openrouter","openrouter/free","Generalist. Give balanced, practical answers."],
+ ["Nemotron 3 Ultra","openrouter","nvidia/nemotron-3-ultra","Deep reasoner. Solve hard problems step by step."],
+ ["Nemotron 3 Super","openrouter","nvidia/nemotron-3-super","Strategist. Plan approaches and weigh trade-offs."],
+ ["Gemma 4 31B","openrouter","google/gemma-4-31b","Explainer. Make things clear and simple."],
+ ["Inkling","openrouter","inkling","Writer. Draft polished text and documentation."],
+ ["Nemotron 3.5 Lightning","openrouter","nvidia/nemotron-3.5-lightning","Fast responder. Give quick sanity checks and short answers."],
+ ["North Mini Code","openrouter","north-mini-code","Coder. Produce concise working code."],
+ ["Qwen3.8 27B","openrouter","qwen/qwen3.8-27b","Analyst. Check facts, logic and edge cases."],
+ ["Qwen3.8 Max","openrouter","qwen/qwen3.8-max","Lead architect. Integrate everything into a robust solution."],
+ ["Ollama Local","ollama","llama3","Private local assistant. Be concise."],
+ ["Critic","openrouter","openrouter/free","Critic. Find flaws, risks and missing pieces in what others said."]
+];
+var store={get:function(k){try{return localStorage.getItem(k)}catch(e){return null}},set:function(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+var agents,history=[],abort=null,running=false;
+
+function load(){
+ var s=null;try{s=JSON.parse(store.get("ac_agents"))}catch(e){}
+ agents=ROLES.map(function(r,i){
+  var o={id:i,name:r[0],provider:r[1],model:r[2],role:r[3],on:i<5,color:COLORS[i]};
+  if(s&&s[i]){for(var k in s[i])o[k]=s[i][k]}
+  return o;
+ });
+ try{var h=JSON.parse(store.get("ac_hist"));if(Array.isArray(h))history=h}catch(e){}
+ $("orKey").value=store.get("ac_key")||"";
+ $("ollamaUrl").value=store.get("ac_ollama")||"http://localhost:11434";
+ $("demo").value=store.get("ac_backend")||"demo";
+ $("mode").value=store.get("ac_mode")||"roundtable";
+ if(store.get("ac_theme")==="light")document.documentElement.classList.add("light");
+}
+function save(){
+ store.set("ac_agents",JSON.stringify(agents));
+ store.set("ac_hist",JSON.stringify(history.slice(-100)));
+ store.set("ac_key",$("orKey").value);
+ store.set("ac_ollama",$("ollamaUrl").value);
+ store.set("ac_backend",$("demo").value);
+ store.set("ac_mode",$("mode").value);
+}
+function renderAgents(){
+ var box=$("agents");box.innerHTML="";
+ agents.forEach(function(a){
+  var d=document.createElement("div");d.className="agent";
+  var cb=document.createElement("input");cb.type="checkbox";cb.checked=a.on;cb.id="ag"+a.id;
+  cb.setAttribute("aria-label","Enable "+a.name);
+  cb.onchange=function(){a.on=cb.checked;updateCount();save()};
+  var dot=document.createElement("span");dot.className="dot";dot.style.background=a.color;
+  var m=document.createElement("div");m.className="meta";
+  m.innerHTML='<div class="name"></div><div class="role"></div>';
+  m.firstChild.textContent=a.name;m.lastChild.textContent=a.provider==="ollama"?"local · "+a.model:a.model;
+  var b=document.createElement("button");b.className="btn";b.textContent="Edit";b.setAttribute("aria-label","Edit "+a.name);
+  b.onclick=function(){openEdit(a)};
+  d.appendChild(cb);d.appendChild(dot);d.appendChild(m);d.appendChild(b);box.appendChild(d);
+ });
+ var sy=$("synth"),cur=sy.value||"8";sy.innerHTML="";
+ agents.forEach(function(a){var o=document.createElement("option");o.value=a.id;o.textContent=a.name;sy.appendChild(o)});
+ sy.value=cur;
+ updateCount();
+}
+function updateCount(){$("activeCount").textContent=agents.filter(function(a){return a.on}).length}
+var editing=null;
+function openEdit(a){
+ editing=a;$("eModel").setAttribute("list","modelOptions");$("eName").value=a.name;$("eProv").value=a.provider;$("eModel").value=a.model;$("eRole").value=a.role;
+ $("editor").showModal();
+}
+$("editor").addEventListener("close",function(){
+ if($("editor").returnValue==="save"&&editing){
+  editing.name=$("eName").value.trim()||editing.name;
+  editing.provider=$("eProv").value;editing.model=$("eModel").value.trim();editing.role=$("eRole").value;
+  save();renderAgents();
+ }
+ editing=null;
+});
+
+function addMsg(m,noStore){
+ var d=document.createElement("div");
+ var cls="msg "+(m.type||"agent");d.className=cls;
+ if(m.color)d.style.borderLeftColor=m.color;
+ var who=document.createElement("div");who.className="who";
+ who.textContent=m.who;
+ if(m.tag){var t=document.createElement("span");t.className="tag";t.textContent=m.tag;who.appendChild(t)}
+ var body=document.createElement("div");body.className="body";
+ renderBody(body,m.text);
+ d.appendChild(who);d.appendChild(body);
+ $("log").appendChild(d);$("log").scrollTop=$("log").scrollHeight;
+ if(!noStore){history.push(m);save()}
+ return {el:d,body:body};
+}
+function renderBody(el,text){
+ el.textContent="";
+ var parts=String(text).split("```");
+ parts.forEach(function(p,i){
+  if(i%2){var pre=document.createElement("pre");pre.textContent=p.replace(/^[a-zA-Z0-9]*\n/,"");el.appendChild(pre)}
+  else if(p){el.appendChild(document.createTextNode(p))}
+ });
+}
+function sys(t){addMsg({type:"sys",who:"System",text:t},true)}
+function setState(t){$("state").textContent=t}
+
+function transcript(){
+ return history.filter(function(m){return m.type!=="sys"}).slice(-30).map(function(m){return m.who+": "+m.text}).join("\n\n");
+}
+function buildMessages(a,task,extra){
+ var others=agents.filter(function(x){return x.on&&x.id!==a.id}).map(function(x){return x.name}).join(", ");
+ var sysP="You are "+a.name+", one agent in a multi-agent team working together"+(others?" with: "+others:"")+". Your role: "+a.role+" Collaborate: build on, correct or challenge teammates' points by name. Be concise and useful. Use code blocks for code.";
+ var msgs=[{role:"system",content:sysP}];
+ msgs.push({role:"user",content:"Conversation so far:\n"+transcript()+"\n\nCurrent task: "+task+(extra?"\n\n"+extra:"")});
+ return msgs;
+}
+function demoReply(a,task,extra){
+ return new Promise(function(res,rej){
+  var t=setTimeout(function(){
+   var focus=task.replace(/\s+/g," ").slice(0,90);
+   var prior=history.filter(function(m){return m.type==="agent"&&m.who!==a.name}).slice(-1)[0];
+   var ref=prior?"Building on "+prior.who+"'s point, ":"";
+   var txt=ref+"as "+a.name+" ("+a.role.split(".")[0].toLowerCase()+"), my take on \""+focus+"\":\n• Clarify the goal and constraints first.\n• Split into small verifiable steps.\n• Main risk to watch: unclear requirements and edge cases.\n\n(Demo mode: switch Backend to Live and add your OpenRouter key for real model output.)";
+   res(txt);
+  },500+Math.random()*700);
+  if(abort)abort.signal.addEventListener("abort",function(){clearTimeout(t);rej(new DOMException("Aborted","AbortError"))});
+ });
+}
+async function liveReply(a,task,extra){
+ var msgs=buildMessages(a,task,extra),r,j;
+ if(a.provider==="ollama"){
+  var base=$("ollamaUrl").value.replace(/\/$/,"");
+  r=await fetch(base+"/api/chat",{method:"POST",signal:abort.signal,headers:{"Content-Type":"application/json"},body:JSON.stringify({model:a.model,messages:msgs,stream:false})});
+  if(!r.ok)throw new Error("Ollama HTTP "+r.status);
+  j=await r.json();return j.message&&j.message.content||"(empty)";
+ }
+ var key=$("orKey").value.trim();
+ if(!key)throw new Error("Missing OpenRouter API key");
+ r=await fetch("https://openrouter.ai/api/v1/chat/completions",{method:"POST",signal:abort.signal,headers:{"Content-Type":"application/json","Authorization":"Bearer "+key},body:JSON.stringify({model:a.model,messages:msgs})});
+ if(!r.ok){var tx="";try{tx=(await r.text()).slice(0,200)}catch(e){}throw new Error("OpenRouter HTTP "+r.status+" "+tx)}
+ j=await r.json();
+ return j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content||"(empty)";
+}
+async function ask(a,task,extra,tag){
+ var ph=addMsg({type:"agent",who:a.name,color:a.color,tag:tag,text:"…thinking"},true);
+ ph.body.classList.add("typing");
+ setState(a.name+" is working…");
+ try{
+  var out=$("demo").value==="demo"?await demoReply(a,task,extra):await liveReply(a,task,extra);
+  ph.el.remove();
+  addMsg({type:"agent",who:a.name,color:a.color,tag:tag,text:out});
+  return out;
+ }catch(e){
+  ph.el.remove();
+  if(e.name==="AbortError")throw e;
+  addMsg({type:"sys",who:"Error · "+a.name,text:e.message||String(e)});
+  return null;
+ }
+}
+function pickTargets(text){
+ var on=agents.filter(function(a){return a.on});
+ var mentioned=agents.filter(function(a){return text.toLowerCase().indexOf("@"+a.name.toLowerCase())>-1});
+ if(mentioned.length)return mentioned;
+ return $("mode").value==="solo"?[]:on;
+}
+async function run(text){
+ var targets=pickTargets(text),mode=$("mode").value;
+ if(!targets.length){sys("No agents selected. Enable agents or @mention one (e.g. @Gemma 4 31B).");return}
+ var rounds=Math.max(1,Math.min(5,parseInt($("rounds").value,10)||1));
+ abort=new AbortController();running=true;toggle(true);
+ try{
+  if(mode==="pipeline"){
+   var prev="";
+   for(var i=0;i<targets.length;i++){
+    var o=await ask(targets[i],text,prev?"Previous agent's output to improve and extend:\n"+prev:"You start the pipeline.","step "+(i+1)+"/"+targets.length);
+    if(o)prev=o;
+   }
+  }else{
+   var R=(mode==="solo")?1:rounds;
+   for(var r=1;r<=R;r++){
+    for(var j=0;j<targets.length;j++){
+     var ex=r>1?(mode==="debate"?"Round "+r+": respond to disagreements and refine your position.":"Round "+r+": refine using teammates' latest input."):"";
+     await ask(targets[j],text,ex,R>1?"round "+r:"");
+    }
+   }
+   if(targets.length>1){
+    var s=agents[parseInt($("synth").value,10)]||targets[0];
+    await ask(s,text,"Synthesize the team's discussion into one final, actionable answer. Note any unresolved disagreements.","final synthesis");
+   }
+  }
+  setState("Done");
+ }catch(e){
+  if(e.name==="AbortError"){sys("Stopped.");setState("Stopped")}
+ }finally{running=false;abort=null;toggle(false)}
+}
+function toggle(b){$("stop").disabled=!b;$("send").disabled=b;$("hint").textContent=b?"Agents are collaborating…":""}
+
+$("form").addEventListener("submit",function(e){
+ e.preventDefault();
+ if(running)return;
+ var t=$("input").value.trim();if(!t)return;
+ addMsg({type:"user",who:"You",text:t});
+ $("input").value="";
+ run(t);
+});
+$("input").addEventListener("keydown",function(e){
+ if((e.ctrlKey||e.metaKey)&&e.key==="Enter"){e.preventDefault();$("form").requestSubmit()}
+});
+$("stop").onclick=function(){if(abort)abort.abort()};
+document.querySelectorAll(".chip").forEach(function(c){
+ c.onclick=function(){
+  var on=c.getAttribute("aria-pressed")==="true";
+  document.querySelectorAll(".chip").forEach(function(x){x.setAttribute("aria-pressed","false")});
+  if(!on){c.setAttribute("aria-pressed","true");$("input").value=c.dataset.t;$("input").focus()}
+ };
+ c.setAttribute("aria-pressed","false");
+});
+$("allOn").onclick=function(){agents.forEach(function(a){a.on=true});renderAgents();save()};
+$("allOff").onclick=function(){agents.forEach(function(a){a.on=false});renderAgents();save()};
+$("theme").onclick=function(){
+ var l=document.documentElement.classList.toggle("light");store.set("ac_theme",l?"light":"dark");
+};
+$("clear").onclick=function(){
+ if(running&&abort)abort.abort();
+ history=[];$("log").innerHTML="";save();sys("Conversation cleared.");
+};
+$("export").onclick=function(){
+ var txt=history.map(function(m){return "["+m.who+(m.tag?" · "+m.tag:"")+"]\n"+m.text}).join("\n\n---\n\n");
+ try{
+  var b=new Blob([txt||"(empty)"],{type:"text/plain"}),u=URL.createObjectURL(b),a=document.createElement("a");
+  a.href=u;a.download="agent-council.txt";document.body.appendChild(a);a.click();a.remove();
+  setTimeout(function(){URL.revokeObjectURL(u)},1000);
+ }catch(e){sys("Export failed: "+e.message)}
+};
+["orKey","ollamaUrl","demo","mode"].forEach(function(id){$(id).addEventListener("change",save)});
+$("openSide").onclick=function(){$("side").classList.add("open")};
+$("closeSide").onclick=function(){$("side").classList.remove("open")};
+$("closeSide").classList.add("menu-btn");
+
+
+ // Add custom agents without editing source code.
+ $("addAgent").onclick=function(){
+  var name=prompt("Agent name (for example, Researcher):"); if(!name||!name.trim())return;
+  var provider=(prompt("Provider: openrouter or ollama", "openrouter")||"openrouter").trim().toLowerCase();
+  if(provider!=="ollama")provider="openrouter";
+  var model=prompt(provider==="ollama"?"Installed Ollama model name (e.g. qwen2.5:14b):":"OpenRouter model ID (e.g. openai/gpt-4o-mini):", provider==="ollama"?"qwen2.5:14b":"openai/gpt-4o-mini");
+  if(!model||!model.trim())return;
+  var role=prompt("Agent role / instructions:","Research carefully, state uncertainty, verify claims where possible, and give actionable answers.")||"General-purpose assistant. Be accurate and useful.";
+  var id=agents.reduce(function(n,a){return Math.max(n,a.id+1)},0);
+  agents.push({id:id,name:name.trim(),provider:provider,model:model.trim(),role:role,on:true,color:COLORS[id%COLORS.length]});
+  save();renderAgents();sys("Added agent: "+name.trim()+". Check that its provider and model ID are valid.");
+ };
+ // Refresh public model IDs from OpenRouter; does not imply every model is free or usable.
+ $("refreshModels").onclick=async function(){
+  var b=$("refreshModels"),old=b.textContent;b.disabled=true;b.textContent="Loading models…";
+  try{var r=await fetch("https://openrouter.ai/api/v1/models");if(!r.ok)throw new Error("HTTP "+r.status);var j=await r.json();
+   var dl=$("modelOptions");dl.innerHTML="";(j.data||[]).forEach(function(m){if(m.id){var o=document.createElement("option");o.value=m.id;o.label=(m.name||m.id);dl.appendChild(o)}});
+   document.querySelectorAll("#eModel").forEach(function(el){el.setAttribute("list","modelOptions")});
+   sys("Loaded "+dl.children.length+" public OpenRouter model IDs. Availability, pricing, context limits and permissions vary by model; choose a model ID in an agent's Edit dialog.");
+  }catch(e){sys("Could not refresh model list: "+e.message+". Check your connection and try again.");}
+  finally{b.disabled=false;b.textContent=old;}
+ };
+ load();renderAgents();
+ $("synth").value="8";
+history.forEach(function(m){addMsg(m,true)});
+if(!history.length)sys("Welcome! Pick agents in the side panel, choose a collaboration mode, and describe your problem. Demo mode works offline; switch to Live and add an OpenRouter key (and Ollama URL for the local agent) for real responses. Model IDs are editable per agent.");
+if("serviceWorker" in navigator && location.protocol.startsWith("http")){window.addEventListener("load",function(){navigator.serviceWorker.register("./sw.js").catch(function(e){console.warn("Offline cache unavailable",e)})})}
+})();
+</script>
+</body>
+</html>
